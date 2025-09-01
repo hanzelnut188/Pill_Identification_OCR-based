@@ -26,96 +26,210 @@ def enhance_contrast(img, clip_limit, alpha, beta):
     return cv2.addWeighted(enhance_img, alpha, blurred, beta, 0)
 
 
-def extract_dominant_colors_by_ratio(cropped_img, k=4, min_ratio=0.38):
-    import colorsys
-    import numpy as np
-    import cv2
-    from collections import Counter
+# def extract_dominant_colors_by_ratio(cropped_img, k=4, min_ratio=0.38):
+#     import colorsys
+#     import numpy as np
+#     import cv2
+#     from collections import Counter
 
-    def rgb_to_color_group(rgb):
-        r, g, b = rgb / 255.0
-        h, s, v = colorsys.rgb_to_hsv(r, g, b)
-        h_deg = h * 360
-        if v < 0.2:
-            return "黑色"
-        if s < 0.1 and v > 0.9:
-            return "白色"
-        if s < 0.05 and v > 0.6:
-            return "透明"
-        if h_deg < 15 or h_deg >= 345:
-            return "紅色"
-        elif h_deg < 40:
-            return "橘色"
-        elif h_deg < 55:
-            return "皮膚色"
-        elif h_deg < 65:
-            return "黃色"
-        elif h_deg < 170:
-            return "綠色"
-        elif h_deg < 250:
-            return "藍色"
-        elif h_deg < 290:
-            return "紫色"
-        elif h_deg < 345:
-            return "粉紅色"
-        if s > 0.2 and v < 0.5:
-            return "棕色"
-        return "未知"
+#     def rgb_to_color_group(rgb):
+#         r, g, b = rgb / 255.0
+#         h, s, v = colorsys.rgb_to_hsv(r, g, b)
+#         h_deg = h * 360
+#         if v < 0.2:
+#             return "黑色"
+#         if s < 0.1 and v > 0.9:
+#             return "白色"
+#         if s < 0.05 and v > 0.6:
+#             return "透明"
+#         if h_deg < 15 or h_deg >= 345:
+#             return "紅色"
+#         elif h_deg < 40:
+#             return "橘色"
+#         elif h_deg < 55:
+#             return "皮膚色"
+#         elif h_deg < 65:
+#             return "黃色"
+#         elif h_deg < 170:
+#             return "綠色"
+#         elif h_deg < 250:
+#             return "藍色"
+#         elif h_deg < 290:
+#             return "紫色"
+#         elif h_deg < 345:
+#             return "粉紅色"
+#         if s > 0.2 and v < 0.5:
+#             return "棕色"
+#         return "未知"
 
-    similar_color_map = {
-        "皮膚色": "黃色",
-        "橘色": "紅色",
-        "粉紅色": "紅色",
-        "透明": "白色",
-        "棕色": "黑色",
-    }
+#     similar_color_map = {
+#         "皮膚色": "黃色",
+#         "橘色": "紅色",
+#         "粉紅色": "紅色",
+#         "透明": "白色",
+#         "棕色": "黑色",
+#     }
 
-    # ↓ 小圖＋取樣，減少計算量
-    img_rgb = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB)
-    resized = cv2.resize(img_rgb, (48, 48), interpolation=cv2.INTER_AREA)
-    pixels = resized.reshape(-1, 3)
-    # 去掉非常暗的像素（背景/陰影）
-    pixels = pixels[np.sum(pixels, axis=1) > 30]
+#     # ↓ 小圖＋取樣，減少計算量
+#     img_rgb = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB)
+#     resized = cv2.resize(img_rgb, (48, 48), interpolation=cv2.INTER_AREA)
+#     pixels = resized.reshape(-1, 3)
+#     # 去掉非常暗的像素（背景/陰影）
+#     pixels = pixels[np.sum(pixels, axis=1) > 30]
 
-    # 再次隨機取樣最多 1500 個點，足夠穩定
-    if len(pixels) > 1500:
-        idx = np.random.choice(len(pixels), 1500, replace=False)
-        pixels = pixels[idx]
+#     # 再次隨機取樣最多 1500 個點，足夠穩定
+#     if len(pixels) > 1500:
+#         idx = np.random.choice(len(pixels), 1500, replace=False)
+#         pixels = pixels[idx]
 
-    # OpenCV KMeans（float32）
-    Z = np.float32(pixels)
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
-    attempts = 1
-    compactness, labels, centers = cv2.kmeans(
-        Z, k, None, criteria, attempts, cv2.KMEANS_PP_CENTERS
-    )
-    labels = labels.flatten()
-    centers = centers.astype(np.float32)
+#     # OpenCV KMeans（float32）
+#     Z = np.float32(pixels)
+#     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+#     attempts = 1
+#     compactness, labels, centers = cv2.kmeans(
+#         Z, k, None, criteria, attempts, cv2.KMEANS_PP_CENTERS
+#     )
+#     labels = labels.flatten()
+#     centers = centers.astype(np.float32)
 
-    # 統計每群占比
-    counts = np.bincount(labels, minlength=k).astype(np.float32)
-    total = counts.sum() if counts.sum() > 0 else 1.0
+#     # 統計每群占比
+#     counts = np.bincount(labels, minlength=k).astype(np.float32)
+#     total = counts.sum() if counts.sum() > 0 else 1.0
 
-    # 對每群做語意色映射
-    semantic_counter = Counter()
-    for i, cnt in enumerate(counts):
-        color = rgb_to_color_group(centers[i])
-        if color not in ("未知", "透明"):
-            semantic_counter[color] += cnt
+#     # 對每群做語意色映射
+#     semantic_counter = Counter()
+#     for i, cnt in enumerate(counts):
+#         color = rgb_to_color_group(centers[i])
+#         if color not in ("未知", "透明"):
+#             semantic_counter[color] += cnt
 
-    # 取主色（最多 2 種、占比 >= min_ratio）
-    items = [(c, v / total) for c, v in semantic_counter.items()]
-    items.sort(key=lambda x: -x[1])
-    dominant = [c for c, r in items if r >= min_ratio][:2]
+#     # 取主色（最多 2 種、占比 >= min_ratio）
+#     items = [(c, v / total) for c, v in semantic_counter.items()]
+#     items.sort(key=lambda x: -x[1])
+#     dominant = [c for c, r in items if r >= min_ratio][:2]
 
-    # 擴充相近色（不重複）
-    extended = dominant.copy()
-    for c in dominant:
-        sim = similar_color_map.get(c)
-        if sim and sim not in extended:
-            extended.append(sim)
+#     # 擴充相近色（不重複）
+#     extended = dominant.copy()
+#     for c in dominant:
+#         sim = similar_color_map.get(c)
+#         if sim and sim not in extended:
+#             extended.append(sim)
 
-    return extended
+#     return extended
+
+
+def rgb_to_hex(color):
+    """Convert RGB (0-255) to HEX string."""
+    return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+
+def is_color_similar(hsv1, hsv2, h_thresh=20, s_thresh=40, v_thresh=40):
+    """
+    Check if two HSV colors are similar within thresholds.
+    Hue in degrees (0-360), s & v in [0-255].
+    """
+    h1, s1, v1 = hsv1
+    h2, s2, v2 = hsv2
+
+    # circular hue difference (because 0° ≈ 360°)
+    dh = min(abs(h1 - h2), 360 - abs(h1 - h2))
+    ds = abs(s1 - s2)
+    dv = abs(v1 - v2)
+
+    return (dh <= h_thresh) and (ds <= s_thresh) and (dv <= v_thresh)
+
+def get_basic_color_name(rgb):
+    """Classify an RGB value into a basic color family (Chinese Traditional)."""
+    # Convert RGB (0–255) to HSV
+    bgr = np.uint8([[rgb[::-1]]])  # OpenCV expects BGR
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[0][0]
+    h, s, v = hsv
+    h = int(h) * 2  # Convert to degrees (0-360)
+    r, g, b = rgb
+
+    # Handle black/white/gray
+    # if v < 60:   # instead of 40 → more tolerant to lighting
+    #     return "黑色"
+    if s < 40 and v > 170:
+        return "白色"
+    if s < 40:
+        return "灰色"
+
+    # Hue ranges
+    if (h < 10 or h >= 330) and s > 90 and r > 50:
+        return "紅色"
+    elif h < 30:
+        return "棕色" if v < 150 else "橙色"
+    elif h < 60:
+        return "黃色"
+    elif h < 250 and g > b:
+        return "綠色"
+    elif h < 250 and g < b:
+        return "藍色"
+    elif h < 300:  # candidate for pink (270–330)
+        return "紫色"
+    elif h < 360:  # candidate for pink (270–330)
+        return "粉紅色"            
+    else:
+        return "其他"
+
+def get_dominant_colors(image, k=3, ignore_black=True, min_ratio=0.3):
+    """Extract dominant colors using KMeans, ignore black and small/shadow clusters."""
+    # resize for speed
+    img = cv2.resize(image, (600, 400))
+    img_flat = img.reshape((-1, 3))
+
+    # run kmeans
+    kmeans = KMeans(n_clusters=k, n_init=10, random_state=42)
+    labels = kmeans.fit_predict(img_flat)
+
+    counts = Counter(labels)
+    centers = kmeans.cluster_centers_
+
+    # order by frequency
+    ordered = counts.most_common()
+    ordered_colors = [centers[i] for i, _ in ordered]
+
+    # filter out black if requested
+    if ignore_black:
+        def is_black(c, threshold=40):  # v < 40 means black
+            bgr = np.uint8([[c[::-1]]])
+            h, s, v = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[0][0]
+            return v < threshold
+        ordered_colors = [c for c in ordered_colors if not is_black(c)]
+
+    # ---- merge similar colors ----
+    merged_colors = []
+    for idx, c in enumerate(ordered_colors):
+        bgr = np.uint8([[c[::-1]]])
+        h_raw, s, v = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[0][0]
+        h_deg = h_raw * 2
+        hsv_c = (h_deg, int(s), int(v))
+
+        merged = False
+        for mc in merged_colors:
+            if is_color_similar(hsv_c, mc["hsv"]):
+                mc["count"] += counts[ordered[idx][0]]
+                merged = True
+                break
+
+        if not merged:
+            merged_colors.append({
+                "rgb": tuple(map(int, c)),
+                "hsv": hsv_c,
+                "count": counts[ordered[idx][0]]
+            })
+
+    # ---- filter out small clusters (shadows, noise) ----
+    total = sum(mc["count"] for mc in merged_colors)
+    filtered_colors = [mc for mc in merged_colors if mc["count"] / total >= min_ratio]
+
+    # safeguard: if all removed, keep the largest one
+    if not filtered_colors and merged_colors:
+        filtered_colors = [max(merged_colors, key=lambda mc: mc["count"])]
+
+    hex_colors = [rgb_to_hex(mc["rgb"]) for mc in filtered_colors]
+
+    return [mc["rgb"] for mc in filtered_colors], hex_colors
 
 
 # ===外型辨識函式 ===

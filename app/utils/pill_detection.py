@@ -17,7 +17,7 @@ from app.utils.shape_color_utils import (
     enhance_for_blur,
     # extract_dominant_colors_by_ratio,
     get_basic_color_name,
-    get_dominant_colors
+    get_dominant_colors,
     detect_shape_from_image
 )
 from app.utils.logging_utils import log_mem

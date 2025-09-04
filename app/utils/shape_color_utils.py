@@ -270,6 +270,18 @@ def detect_shape_from_image(cropped_img, original_img=None, expected_shape=None)
         print(f"❗ 發生錯誤：{e}")  # 註解SSS
         return "錯誤", None
 
+def increase_brightness(img, value=30):
+    """Increase brightness of an RGB image by boosting V channel in HSV."""
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    h, s, v = cv2.split(hsv)
+
+    lim = 255 - value
+    v[v > lim] = 255
+    v[v <= lim] += value
+
+    final_hsv = cv2.merge((h, s, v))
+    img_bright = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2RGB)
+    return img_bright
 
 # === 增強處理函式 ===
 

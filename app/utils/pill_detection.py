@@ -18,6 +18,7 @@ from app.utils.shape_color_utils import (
     # extract_dominant_colors_by_ratio,
     get_basic_color_name,
     get_dominant_colors,
+    increase_brightness, 
     detect_shape_from_image
 )
 from app.utils.logging_utils import log_mem
@@ -161,7 +162,7 @@ def process_image(img_path: str):
 
     # === 外型、顏色分析（直接用裁切圖，不去背） ===
     shape, _ = detect_shape_from_image(cropped, cropped, expected_shape=None)
-
+    cropped = increase_brightness(cropped, value=20) 
     rgb_colors, hex_colors = get_dominant_colors(cropped, k=3, min_ratio=0.30)
     rgb_colors_int = [tuple(map(int, c)) for c in rgb_colors]
     basic_names = []

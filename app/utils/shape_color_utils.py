@@ -1,6 +1,10 @@
 import cv2
 
-
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from collections import Counter
 def rotate_image_by_angle(image, angle):
     """
     將圖片依指定角度旋轉。
@@ -25,102 +29,28 @@ def enhance_contrast(img, clip_limit, alpha, beta):
     blurred = cv2.GaussianBlur(enhance_img, (5, 5), 3.0)
     return cv2.addWeighted(enhance_img, alpha, blurred, beta, 0)
 
-
-# def extract_dominant_colors_by_ratio(cropped_img, k=4, min_ratio=0.38):
-#     import colorsys
-#     import numpy as np
-#     import cv2
-#     from collections import Counter
-
-#     def rgb_to_color_group(rgb):
-#         r, g, b = rgb / 255.0
-#         h, s, v = colorsys.rgb_to_hsv(r, g, b)
-#         h_deg = h * 360
-#         if v < 0.2:
-#             return "黑色"
-#         if s < 0.1 and v > 0.9:
-#             return "白色"
-#         if s < 0.05 and v > 0.6:
-#             return "透明"
-#         if h_deg < 15 or h_deg >= 345:
-#             return "紅色"
-#         elif h_deg < 40:
-#             return "橘色"
-#         elif h_deg < 55:
-#             return "皮膚色"
-#         elif h_deg < 65:
-#             return "黃色"
-#         elif h_deg < 170:
-#             return "綠色"
-#         elif h_deg < 250:
-#             return "藍色"
-#         elif h_deg < 290:
-#             return "紫色"
-#         elif h_deg < 345:
-#             return "粉紅色"
-#         if s > 0.2 and v < 0.5:
-#             return "棕色"
-#         return "未知"
-
-#     similar_color_map = {
-#         "皮膚色": "黃色",
-#         "橘色": "紅色",
-#         "粉紅色": "紅色",
-#         "透明": "白色",
-#         "棕色": "黑色",
-#     }
-
-#     # ↓ 小圖＋取樣，減少計算量
-#     img_rgb = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB)
-#     resized = cv2.resize(img_rgb, (48, 48), interpolation=cv2.INTER_AREA)
-#     pixels = resized.reshape(-1, 3)
-#     # 去掉非常暗的像素（背景/陰影）
-#     pixels = pixels[np.sum(pixels, axis=1) > 30]
-
-#     # 再次隨機取樣最多 1500 個點，足夠穩定
-#     if len(pixels) > 1500:
-#         idx = np.random.choice(len(pixels), 1500, replace=False)
-#         pixels = pixels[idx]
-
-#     # OpenCV KMeans（float32）
-#     Z = np.float32(pixels)
-#     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
-#     attempts = 1
-#     compactness, labels, centers = cv2.kmeans(
-#         Z, k, None, criteria, attempts, cv2.KMEANS_PP_CENTERS
-#     )
-#     labels = labels.flatten()
-#     centers = centers.astype(np.float32)
-
-#     # 統計每群占比
-#     counts = np.bincount(labels, minlength=k).astype(np.float32)
-#     total = counts.sum() if counts.sum() > 0 else 1.0
-
-#     # 對每群做語意色映射
-#     semantic_counter = Counter()
-#     for i, cnt in enumerate(counts):
-#         color = rgb_to_color_group(centers[i])
-#         if color not in ("未知", "透明"):
-#             semantic_counter[color] += cnt
-
-#     # 取主色（最多 2 種、占比 >= min_ratio）
-#     items = [(c, v / total) for c, v in semantic_counter.items()]
-#     items.sort(key=lambda x: -x[1])
-#     dominant = [c for c, r in items if r >= min_ratio][:2]
-
-#     # 擴充相近色（不重複）
-#     extended = dominant.copy()
-#     for c in dominant:
-#         sim = similar_color_map.get(c)
-#         if sim and sim not in extended:
-#             extended.append(sim)
-
-#     return extended
-
-
 def rgb_to_hex(color):
     """Convert RGB (0-255) to HEX string."""
     return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+
+def get_center_region(img, size=100):
+    """
+    擷取圖片的中央區域 (固定大小)。
+    - img: 輸入圖片 (H, W, C)
+    - size: 方形區域邊長 (像素)，預設 100
+    - return: 中央裁切後的圖片
+    """
+    h, w = img.shape[:2]
+
+    cx, cy = w // 2, h // 2  # 圖片中心點
+
+    # 計算邊界
+    x1 = max(cx - size // 2, 0)
+    y1 = max(cy - size // 2, 0)
+    x2 = min(cx + size // 2, w)
+    y2 = min(cy + size // 2, h)
+
+    return img[y1:y2, x1:x2]
 
 def is_color_similar(hsv1, hsv2, h_thresh=20, s_thresh=40, v_thresh=40):
     """
@@ -143,9 +73,10 @@ def get_basic_color_name(rgb):
     bgr = np.uint8([[rgb[::-1]]])  # OpenCV expects BGR
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[0][0]
     h, s, v = hsv
-    h = int(h) * 2  # Convert to degrees (0-360)
+    print(f"HSV: {h}, {s}, {v}")
+    h = int(h)*2   # Convert to degrees (0-360)
     r, g, b = rgb
-
+    print(f"RGB: {r}, {g}, {b}")
     # Handle black/white/gray
     # if v < 60:   # instead of 40 → more tolerant to lighting
     #     return "黑色"
@@ -171,6 +102,19 @@ def get_basic_color_name(rgb):
         return "粉紅色"            
     else:
         return "其他"
+
+
+def get_image_rgb(path: str):
+    """
+    Load an image (jpg/png/heic) and return as RGB numpy array.
+    """
+    try:
+        # Use PIL so HEIC is supported
+        pil_img = Image.open(path).convert("RGB")
+        return np.array(pil_img)  # RGB format
+    except Exception as e:
+        raise FileNotFoundError(f"Could not read {path}: {e}")
+
 
 def get_dominant_colors(image, k=3, ignore_black=True, min_ratio=0.3):
     """Extract dominant colors using KMeans, ignore black and small/shadow clusters."""
@@ -230,6 +174,40 @@ def get_dominant_colors(image, k=3, ignore_black=True, min_ratio=0.3):
     hex_colors = [rgb_to_hex(mc["rgb"]) for mc in filtered_colors]
 
     return [mc["rgb"] for mc in filtered_colors], hex_colors
+
+def increase_brightness(img, value=30):
+    """Increase brightness of an RGB image by boosting V channel in HSV."""
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    h, s, v = cv2.split(hsv)
+
+    lim = 255 - value
+    v[v > lim] = 255
+    v[v <= lim] += value
+
+    final_hsv = cv2.merge((h, s, v))
+    img_bright = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2RGB)
+    return img_bright
+
+
+
+def get_center_region(img, size=100):
+    """
+    擷取圖片的中央區域 (固定大小)。
+    - img: 輸入圖片 (H, W, C)
+    - size: 方形區域邊長 (像素)，預設 100
+    - return: 中央裁切後的圖片
+    """
+    h, w = img.shape[:2]
+
+    cx, cy = w // 2, h // 2  # 圖片中心點
+
+    # 計算邊界
+    x1 = max(cx - size // 2, 0)
+    y1 = max(cy - size // 2, 0)
+    x2 = min(cx + size // 2, w)
+    y2 = min(cy + size // 2, h)
+
+    return img[y1:y2, x1:x2]
 
 
 # ===外型辨識函式 ===
